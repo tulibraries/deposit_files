@@ -12,4 +12,5 @@ class Manifest
 end
 
 class Checksum
+  attr_reader :checksums
 end

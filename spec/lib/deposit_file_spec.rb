@@ -36,14 +36,14 @@ end
 
 RSpec.describe Checksum do
   context "Read checksum file" do
-    let (:checksum) { Checksum.new ("spec/fixtures/checksum.txt") }
+    let (:checksum) { Checksum.new ("spec/fixtures/kittens/admin/checksum.txt") }
     it "reads the file" do
       file_checksums = Array.new
       file_checksums = checksum.to_array
       expect(file_checksums.count).to eq 3
-      expect(file_checksums[0].path).to eq "spec/fixtures/staging/image1.tif"
-      expect(file_checksums[1].path).to eq "spec/fixtures/staging/image2.tif"
-      expect(file_checksums[2].path).to eq "spec/fixutres/staging/image3.tif"
+      expect(file_checksums[0].path).to eq "pictures/image1.gif"
+      expect(file_checksums[1].path).to eq "pictures/image2.gif`"
+      expect(file_checksums[2].path).to eq "pictures/image3.gif"
     end
 
     it "parses creates a file/checksum array"
