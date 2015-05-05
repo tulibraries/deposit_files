@@ -1,4 +1,4 @@
 source "https://rubygems.org"
 
-gem 'pry'
+gem 'pry-remote'
 gem 'rspec', '~> 3.0'
