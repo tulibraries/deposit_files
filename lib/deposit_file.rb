@@ -1,5 +1,6 @@
 require 'CSV'
 require 'Digest'
+require 'FileUtils'
 
 class Manifest
   attr_reader :drivename, :destination, :share, :name, :email
