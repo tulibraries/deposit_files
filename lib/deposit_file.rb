@@ -16,11 +16,13 @@ class Manifest
 end
 
 module FileQA
+  attr_reader :problems
+
   ADMIN_DIR = "admin"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum_remote.txt"
 
-  class FileMismatchError < StandardError
+  class FileTransferError < StandardError
   end
 
   def self.read_checksums(checksum_path)
@@ -77,10 +79,18 @@ module FileQA
     # Read remote checksum file
     remote_checksums = self.read_checksums("#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{REMOTE_CHECKSUM_FILENAME}")
     # Compare checksum file
-    problem_checksums = Array.new
-
-    if problem_checksums.count > 0
-      raise FileMismatchError, "File mismatch error"
+    @problems = Array.new
+    local_checksums.keys.each do |path|
+      if (remote_checksums[path].nil?)
+        puts "#{path} File missing"
+        @problems << { :local_path => path, :error => "missing" }
+      elsif (local_checksums[path] != remote_checksums[path])
+        puts "File mismatch #{path} | #{local_checksums[path]} : #{remote_checksums[path]}"
+        @problems << { :local_path => path, :error => "mismatch", :local_checksum => local_checksums[path], :remote_checksum => remote_checksums[:path] }
+      end
     end
+
+    @problems
   end
+
 end

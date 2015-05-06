@@ -94,21 +94,24 @@ RSpec.describe FileQA do
     end
   end
 
-  context "QA files" do
-    before (:each) do
-      FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
-    end
-
+  context "QA operation" do
     it "detects matching local and remote checksum file" do
+      FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
       expect { FileQA::verify_file_upload(collection_drivename, collection_name) }.to_not raise_error
     end
 
-    xit "detects non-matching local and remote checksum file" do
-      expect { FileQA::verify_file_upload(collection_drivename, collection_name) }.to raise_error(FileQA::FileMismatchError)
+    it "detects non-matching local and remote checksum file" do
+      FileUtils.cp "spec/fixtures/alternate/pictures/image2.jpg", "tmp/kittens/pictures/image2.jpg"
+      FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
+      problems = FileQA::verify_file_upload(collection_drivename, collection_name)
+      expect(problems.first).to include(:error => "mismatch")
     end
 
-    xit "detects missing remote file" do
-      expect { FileQA::verify_file_upload(collection_drivename, collection_name) }.to raise_error(FileMissingError)
+    it "detects missing remote file" do
+      FileUtils.rm "tmp/kittens/pictures/image2.jpg"
+      FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
+      problems = FileQA::verify_file_upload(collection_drivename, collection_name)
+      expect(problems.first).to include(:error => "missing")
     end
   end
 end
