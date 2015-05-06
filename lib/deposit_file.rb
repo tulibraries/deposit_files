@@ -15,11 +15,17 @@ class Manifest
 end
 
 module FileQA
+  ADMIN_DIR = "admin"
+  LOCAL_CHECKSUM_FILENAME = "checksum.txt"
+  REMOTE_CHECKSUM_FILENAME = "checksum_remote.txt"
 
-  def self.read(checksum_path)
-    checksums = Array.new
+  class FileMismatchError < StandardError
+  end
+
+  def self.read_checksums(checksum_path)
+    checksums = Hash.new
     CSV.foreach(checksum_path, :col_sep => '|').each do |row|
-      checksums << { :path => row[0], :checksum => row[1] }
+      checksums[row[0]] = row[1]
     end
     checksums
   end
@@ -61,6 +67,19 @@ module FileQA
       checksums.each do |row|
         csv << [row[:path],row[:checksum]]
       end
+    end
+  end
+
+  def self.verify_file_upload(drivename, collection_name)
+    # Read local checksum file
+    local_checksums = self.read_checksums("#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{LOCAL_CHECKSUM_FILENAME}")
+    # Read remote checksum file
+    remote_checksums = self.read_checksums("#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{REMOTE_CHECKSUM_FILENAME}")
+    # Compare checksum file
+    problem_checksums = Array.new
+
+    if problem_checksums.count > 0
+      raise FileMismatchError, "File mismatch error"
     end
   end
 end

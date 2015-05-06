@@ -1,5 +1,4 @@
 require 'deposit_file'
-require 'FileUtils'
 
 RSpec.describe Manifest do
   before (:each) do
@@ -48,10 +47,13 @@ RSpec.describe FileQA do
     FileUtils.cp_r "spec/fixtures/kittens", "tmp"
   end
 
-
   after (:each) do
     FileUtils.rm_r "tmp/kittens"
   end
+
+  let (:collection_drivename) { "#{Dir.pwd}/tmp" }
+  let (:collection_name) { "kittens" }
+  let (:remote_checksum_file) {"tmp/kittens/admin/checksum_remote.txt"}
 
   let (:expected_checksums) {
         ["535e9c1fff0d2068d24b468103f95107",
@@ -59,21 +61,18 @@ RSpec.describe FileQA do
          "4e95a8c5dfaaf93b8f10115f6d694efc" ]}
 
   context "Reads checksum file" do
-    let (:local_file_checksums) { FileQA::read("tmp/kittens/admin/checksum.txt") }
+    let (:local_file_checksums) { FileQA::read_checksums("tmp/kittens/admin/checksum.txt") }
 
     it "has valid data" do
       expect(local_file_checksums.count).to eq 3
-      local_file_checksums.each_with_index do |f, index|
-        expect(f[:path]).to eq "pictures/image#{index+1}.jpg"
-        expect(f[:checksum]).to eq expected_checksums[index]
+      local_file_checksums.keys.each_with_index do |path, index|
+        expect(path).to eq "pictures/image#{index+1}.jpg"
+        expect(local_file_checksums[path]).to eq expected_checksums[index]
       end
     end
   end
 
   context "creates remote checksum files" do
-    let (:collection_drivename) { "#{Dir.pwd}/tmp" }
-    let (:collection_name) { "kittens" }
-    let (:remote_checksum_file) {"tmp/kittens/admin/checksums_remote.txt"}
 
     it "calculates checksums of files in remote" do
       file_checksums = FileQA::calculate_remote_checksums(collection_drivename, collection_name)
@@ -86,19 +85,30 @@ RSpec.describe FileQA do
 
     it "creates a checksum file" do
       FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
-      file_checksums = FileQA::read(remote_checksum_file)
+      file_checksums = FileQA::read_checksums(remote_checksum_file)
       expect(file_checksums.count).to eq 3
-      file_checksums.each_with_index do |f, index|
-        expect(f[:path]).to eq "pictures/image#{index+1}.jpg"
-        expect(f[:checksum]).to eq expected_checksums[index]
+      file_checksums.keys.each_with_index do |path, index|
+        expect(path).to eq "pictures/image#{index+1}.jpg"
+        expect(file_checksums[path]).to eq expected_checksums[index]
       end
     end
   end
 
   context "QA files" do
-    it "detects matching local and remote checksum file"
-    it "detects non-matching local and remote checksum file"
-    it "detects missing remote file"
-  end
+    before (:each) do
+      FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
+    end
 
+    it "detects matching local and remote checksum file" do
+      expect { FileQA::verify_file_upload(collection_drivename, collection_name) }.to_not raise_error
+    end
+
+    xit "detects non-matching local and remote checksum file" do
+      expect { FileQA::verify_file_upload(collection_drivename, collection_name) }.to raise_error(FileQA::FileMismatchError)
+    end
+
+    xit "detects missing remote file" do
+      expect { FileQA::verify_file_upload(collection_drivename, collection_name) }.to raise_error(FileMissingError)
+    end
+  end
 end
