@@ -1,4 +1,5 @@
 require 'deposit_file'
+require 'pry-remote'
 
 RSpec.describe Manifest do
   before (:each) do
@@ -16,7 +17,7 @@ RSpec.describe Manifest do
     let (:destination) { "cats" }
     let (:share) { "deposit" }
     let (:name) { "kittens" }
-    let (:email) { "steven.ng@temple.edu" }
+    let (:email) { "fred@example.com" }
 
     it "Is a valid manifest file" do
       expect(manifest.drivename).to eq drivename
@@ -25,13 +26,6 @@ RSpec.describe Manifest do
       expect(manifest.name).to eq name
       expect(manifest.email).to eq email
     end
-  end
-
-  context "Notification" do
-    it "sends a successful match message"
-    it "sends a unsuccessful match message"
-    it "sends a file missing message"
-    it "sends a successful sync message"
   end
 
   context "Sync files" do
@@ -60,6 +54,16 @@ RSpec.describe FileQA do
          "953056255457fec9de753e4e698a72b7",
          "4e95a8c5dfaaf93b8f10115f6d694efc" ]}
 
+  context "Read config file" do
+
+    it "has expected default values" do
+      config = YAML.load_file(File.expand_path("../../../config/deposit_files.yml.example", __FILE__))
+      expect(config["email_sender"]).to eq "from@example.com"
+      expect(config["email_admin_recipient"]).to match "to@example.com"
+      expect(config["email_delivery_method"]).to eq :sendmail
+    end
+  end
+
   context "Reads checksum file" do
     let (:local_file_checksums) { FileQA::read_checksums("tmp/kittens/admin/checksum.txt") }
 
@@ -72,7 +76,7 @@ RSpec.describe FileQA do
     end
   end
 
-  context "creates remote checksum files" do
+  context "creates remote files" do
 
     it "calculates checksums of files in remote" do
       file_checksums = FileQA::calculate_remote_checksums(collection_drivename, collection_name)
@@ -92,6 +96,38 @@ RSpec.describe FileQA do
         expect(file_checksums[path]).to eq expected_checksums[index]
       end
     end
+
+  end
+
+  context "Problem file" do
+    let (:problems) {
+      [{ :local_path => 'pictures/image1.jpg', :error => 'missing' },
+       { :local_path => 'pictures/image2.jpg', :error => 'mismatch', :local_checksum => '953056255457fec9de753e4e698a72b7', :remote_checksum => '3c9b22c5a405b6cd074df94b879148f5' } ]
+    }
+
+    it "reads problem files" do
+      problems_read = FileQA::read_problems_file("spec/fixtures/problem/problems.txt")
+      expect(problems_read.count).to eq 2
+      expect(problems_read.first[:local_path]).to eq problems.first[:local_path]
+      expect(problems_read.first[:error]).to eq problems.first[:error]
+      expect(problems_read.last[:local_path]).to eq problems.last[:local_path]
+      expect(problems_read.last[:error]).to eq problems.last[:error]
+      expect(problems_read.last[:local_checksum]).to eq problems.last[:local_checksum]
+      expect(problems_read.last[:remote_checksum]).to eq problems.last[:remote_checksum]
+    end
+
+    it "creates problem file" do
+      problems_file = FileQA::create_problems_file(problems, collection_drivename, collection_name)
+      problems_read = FileQA::read_problems_file(problems_file)
+      expect(problems_read.count).to eq 2
+      expect(problems_read.first[:local_path]).to eq problems.first[:local_path]
+      expect(problems_read.first[:error]).to eq problems.first[:error]
+      expect(problems_read.last[:local_path]).to eq problems.last[:local_path]
+      expect(problems_read.last[:error]).to eq problems.last[:error]
+      expect(problems_read.last[:local_checksum]).to eq problems.last[:local_checksum]
+      expect(problems_read.last[:remote_checksum]).to eq problems.last[:remote_checksum]
+    end
+
   end
 
   context "QA operation" do
@@ -113,5 +149,45 @@ RSpec.describe FileQA do
       problems = FileQA::verify_file_upload(collection_drivename, collection_name)
       expect(problems.first).to include(:error => "missing")
     end
+
+  end
+
+  context "Notifier" do
+
+    Mail.defaults do
+      delivery_method :test # in practice you'd do this in spec_helper.rb
+    end
+
+    describe "sending an email" do
+
+      before(:each) do
+        Mail::TestMailer.deliveries.clear
+
+        Mail.deliver do
+          to ['mikel@me.com', 'mike2@me.com']
+          from 'you@you.com'
+          subject 'testing'
+          body 'hello'
+        end
+      end
+
+      it "should deliver" do
+        deliveries = Mail::TestMailer.deliveries
+        expect(deliveries.last.body.raw_source).to eq "hello"
+      end
+
+      it "should have hello" do
+        deliveries = Mail::TestMailer.deliveries
+        expect(deliveries.length).to eq 1
+        expect(deliveries.last.body.raw_source).to eq "hello"
+      end
+
+      it "sends a upload successful message"
+      it "sends a upload mismatch message"
+      it "sends a upload file missing message"
+      it "sends a upload complete message"
+    end
+
+
   end
 end

@@ -1,6 +1,6 @@
 require 'CSV'
-require 'Digest'
-require 'FileUtils'
+require 'fileutils'
+require 'mail'
 
 class Manifest
   attr_reader :drivename, :destination, :share, :name, :email
@@ -21,9 +21,7 @@ module FileQA
   ADMIN_DIR = "admin"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum_remote.txt"
-
-  class FileTransferError < StandardError
-  end
+  PROBLEMS_FILENAME = "problems.txt"
 
   def self.read_checksums(checksum_path)
     checksums = Hash.new
@@ -82,15 +80,41 @@ module FileQA
     @problems = Array.new
     local_checksums.keys.each do |path|
       if (remote_checksums[path].nil?)
-        puts "#{path} File missing"
         @problems << { :local_path => path, :error => "missing" }
       elsif (local_checksums[path] != remote_checksums[path])
-        puts "File mismatch #{path} | #{local_checksums[path]} : #{remote_checksums[path]}"
         @problems << { :local_path => path, :error => "mismatch", :local_checksum => local_checksums[path], :remote_checksum => remote_checksums[:path] }
       end
     end
 
     @problems
+  end
+
+  def self.read_problems_file(problems_file_path)
+    problems = Array.new
+    CSV.foreach(problems_file_path, :col_sep => '|').each do |row|
+      problem = Hash.new
+      problem[:local_path] = row[0]
+      problem[:error] = row[1]
+      problem[:local_checksum] = row[2] if row[2]
+      problem[:remote_checksum] = row[3] if row[3]
+      problems << problem
+    end
+    problems
+  end
+
+  def self.create_problems_file(problems, drivename, collection_name)
+    problems_file_path = "#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{PROBLEMS_FILENAME}"
+    CSV.open(problems_file_path, "w", :col_sep => '|') do |csv|
+      problems.each do |problem|
+        row = Array.new
+        row[0] = problem[:local_path]
+        row[1] = problem[:error]
+        row[2] = problem[:local_checksum] if problem[:local_checksum]
+        row[3] = problem[:remote_checksum] if problem[:remote_checksum]
+        csv << row
+      end
+    end
+    problems_file_path
   end
 
 end

@@ -2,4 +2,4 @@ tmp
 cats
 deposit
 kittens
-steven.ng@temple.edu
+fred@example.com
