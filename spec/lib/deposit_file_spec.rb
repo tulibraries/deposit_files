@@ -47,7 +47,8 @@ RSpec.describe FileQA do
 
   let (:collection_drivename) { "#{Dir.pwd}/tmp" }
   let (:collection_name) { "kittens" }
-  let (:remote_checksum_file) {"tmp/kittens/admin/checksum_remote.txt"}
+  let (:remote_checksum_file) {"tmp/kittens/admin/checksum-remote.txt"}
+  let (:remote_checksum_file_name) {"checksum-remote.txt"}
 
   let (:expected_checksums) {
         ["535e9c1fff0d2068d24b468103f95107",
@@ -55,7 +56,6 @@ RSpec.describe FileQA do
          "4e95a8c5dfaaf93b8f10115f6d694efc" ]}
 
   context "Read config file" do
-
     it "has expected default values" do
       config = YAML.load_file(File.expand_path("../../../config/deposit_files.yml.example", __FILE__))
       expect(config["email_sender"]).to eq "from@example.com"
@@ -154,38 +154,96 @@ RSpec.describe FileQA do
 
   context "Notifier" do
 
-    Mail.defaults do
-      delivery_method :test # in practice you'd do this in spec_helper.rb
+    before (:all) do
+      Mail.defaults do
+        delivery_method :test
+      end
     end
+
+    let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
+    let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
 
     describe "sending an email" do
 
-      before(:each) do
-        Mail::TestMailer.deliveries.clear
+      it "sends a upload successful message" do
+        FileQA::notify(collection_drivename, collection_name)
+        last_email = Mail::TestMailer.deliveries.last
+        expect(last_email.to).to include(manifest.email)
+        expect(last_email.to).to include(config['email_admin_recipient'])
+        expect(last_email.subject).to match /success/i
+        expect(last_email.attachments).to be_empty
+      end
 
-        Mail.deliver do
-          to ['mikel@me.com', 'mike2@me.com']
-          from 'you@you.com'
-          subject 'testing'
-          body 'hello'
+      it "detects mismatch in problems file" do
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
+        expect(FileQA::mismatch?("tmp/kittens/admin/problems.txt")).to be
+        expect(FileQA::missing?("tmp/kittens/admin/problems.txt")).to_not be
+      end
+
+      it "detects missing in problems file" do
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
+        expect(FileQA::missing?("tmp/kittens/admin/problems.txt")).to be
+        expect(FileQA::mismatch?("tmp/kittens/admin/problems.txt")).to_not be
+      end
+
+      describe "Problem message" do
+
+        it "has a problem file attached for file missing errors" do
+          FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
+
+          FileQA::notify(collection_drivename, collection_name)
+          last_email = Mail::TestMailer.deliveries.last
+          expect(last_email.to).to include(manifest.email)
+          expect(last_email.to).to include(config['email_admin_recipient'])
+          expect(last_email.subject).to match /problem/i
+
+          attachments = last_email.attachments.map { |attachment| attachment.filename }
+          expect(attachments).to include("problems.txt")
+          expect(attachments).to_not include("checksums.txt")
+          expect(attachments).to_not include("checksums-remote.txt")
+        end
+
+        it "has a checksum and problem file attached for mismatch errors" do
+          FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
+          FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
+          FileQA::notify(collection_drivename, collection_name)
+
+          last_email = Mail::TestMailer.deliveries.last
+          expect(last_email.to).to include(manifest.email)
+          expect(last_email.to).to include(config['email_admin_recipient'])
+          expect(last_email.subject).to match /problem/i
+
+          attachments = last_email.attachments.map { |attachment| attachment.filename }
+          expect(attachments).to include("problems.txt")
+          expect(attachments).to include("checksum.txt")
+          expect(attachments).to include("checksum-remote.txt")
+        end
+
+        it "has a checksum and problem file attached for missing and mismatch errors" do
+          FileUtils.cp_r "spec/fixtures/problem/problems.txt", "tmp/kittens/admin"
+          FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
+          FileQA::notify(collection_drivename, collection_name)
+
+          last_email = Mail::TestMailer.deliveries.last
+          expect(last_email.to).to include(manifest.email)
+          expect(last_email.to).to include(config['email_admin_recipient'])
+          expect(last_email.subject).to match /problem/i
+
+          attachments = last_email.attachments.map { |attachment| attachment.filename }
+          expect(attachments).to include("problems.txt")
+          expect(attachments).to include("checksum.txt")
+          expect(attachments).to include("checksum-remote.txt")
         end
       end
 
-      it "should deliver" do
-        deliveries = Mail::TestMailer.deliveries
-        expect(deliveries.last.body.raw_source).to eq "hello"
+      it "sends a upload complete message" do
+        FileQA::notify(collection_drivename, collection_name)
+        last_email = Mail::TestMailer.deliveries.last
+        expect(last_email.to).to include(manifest.email)
+        expect(last_email.to).to include(config['email_admin_recipient'])
+        expect(last_email.subject).to match /success/i
+        expect(last_email.attachments.count).to eq 0
       end
-
-      it "should have hello" do
-        deliveries = Mail::TestMailer.deliveries
-        expect(deliveries.length).to eq 1
-        expect(deliveries.last.body.raw_source).to eq "hello"
-      end
-
-      it "sends a upload successful message"
-      it "sends a upload mismatch message"
-      it "sends a upload file missing message"
-      it "sends a upload complete message"
     end
 
 

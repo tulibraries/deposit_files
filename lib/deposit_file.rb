@@ -20,7 +20,7 @@ module FileQA
 
   ADMIN_DIR = "admin"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
-  REMOTE_CHECKSUM_FILENAME = "checksum_remote.txt"
+  REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
   PROBLEMS_FILENAME = "problems.txt"
 
   def self.read_checksums(checksum_path)
@@ -115,6 +115,47 @@ module FileQA
       end
     end
     problems_file_path
+  end
+
+  def self.mismatch?(problems_file_path)
+    CSV.foreach(problems_file_path, :col_sep => '|').each do |row|
+      if row[1] =~ /mismatch/i
+        return true
+      end
+    end
+    return false
+  end
+
+  def self.missing?(problems_file_path)
+    CSV.foreach(problems_file_path, :col_sep => '|').each do |row|
+      if row[1] =~ /missing/i
+        return true
+      end
+    end
+    return false
+  end
+
+  def self.notify(drivename, collection_name)
+    problems_file_dir = "#{drivename}/#{collection_name}/#{ADMIN_DIR}"
+    config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
+    manifest = Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt"))
+    mail = Mail.new do
+      to [config['email_admin_recipient'],  manifest.email]
+      from config['email_sender']
+    end
+    if Dir.entries(problems_file_dir).include? PROBLEMS_FILENAME
+      mail.subject('File Problem Encountered')
+      mail.add_file("#{problems_file_dir}/#{PROBLEMS_FILENAME}")
+      if mismatch?("#{problems_file_dir}/#{PROBLEMS_FILENAME}")
+        mail.add_file("#{problems_file_dir}/#{LOCAL_CHECKSUM_FILENAME}")
+        mail.add_file("#{problems_file_dir}/#{REMOTE_CHECKSUM_FILENAME}")
+      end
+    else
+      mail.subject('File Uploaded Successfully')
+    end
+    mail.body "This is a test message"
+
+    mail.deliver
   end
 
 end
