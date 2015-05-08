@@ -1,6 +1,12 @@
 require 'deposit_file'
 require 'pry-remote'
 
+RSpec::Matchers.define :exist do
+  match do |file_name|
+    File.exist?(File.expand_path(file_name))
+  end
+end
+
 RSpec.describe Manifest do
   before (:each) do
     FileUtils.cp_r "spec/fixtures/kittens", "tmp"
@@ -158,6 +164,10 @@ RSpec.describe FileQA do
       end
     end
 
+    after (:each) do
+      Mail::TestMailer.deliveries.clear
+    end
+
     let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
     let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
 
@@ -235,11 +245,11 @@ RSpec.describe FileQA do
       end
 
       it "sends a upload complete message" do
-        FileQA::notify(collection_drivename, collection_name)
+        FileQA::notify_complete
         last_email = Mail::TestMailer.deliveries.last
         expect(last_email.to).to include(manifest.email)
         expect(last_email.to).to include(config['email_admin_recipient'])
-        expect(last_email.subject).to match /success/i
+        expect(last_email.subject).to match /complete/i
         expect(last_email.attachments.count).to eq 0
       end
     end
@@ -265,10 +275,53 @@ RSpec.describe FileQA do
   end
 
   context "Functional Spec" do
-    xit "successfully transfer files"
-    xit "fails to transfer files due to mismatch"
-    xit "fails to transfer files due to missing file"
-    xit "fails to transfer files due to mismatch and missing file"
+    before (:all) do
+      Mail.defaults do
+        delivery_method :test
+      end
+    end
+
+    before (:each) do
+      Mail::TestMailer.deliveries.clear
+    end
+
+    let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
+    let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
+
+    it "runs successfull end-to-end test" do
+      FileQA::deposit_files
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
+      first_email = Mail::TestMailer.deliveries.first
+      expect(first_email.subject).to match /success/i
+      last_email = Mail::TestMailer.deliveries.last
+      expect(last_email.subject).to match /complete/i
+    end
+
+    it "fails to transfer files due to mismatch" do
+      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/kittens/admin/checksum-remote.txt") do
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
+        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-mismatch.txt", "tmp/kittens/admin/checksum-remote.txt"
+      end
+      FileQA::deposit_files
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
+      first_email = Mail::TestMailer.deliveries.first
+      expect(first_email.subject).to match /problem/i
+      last_email = Mail::TestMailer.deliveries.last
+      expect(last_email.subject).to_not match /complete/i
+    end
+
+    it "fails to transfer files due to missing file" do
+      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/kittens/admin/checksum-remote.txt") do
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
+        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-missing.txt", "tmp/kittens/admin/checksum-remote.txt"
+      end
+      FileQA::deposit_files
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
+      first_email = Mail::TestMailer.deliveries.first
+      expect(first_email.subject).to match /problem/i
+      last_email = Mail::TestMailer.deliveries.last
+      expect(last_email.subject).to_not match /complete/i
+    end
   end
 
 end

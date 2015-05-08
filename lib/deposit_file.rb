@@ -161,6 +161,18 @@ module FileQA
     mail.deliver
   end
 
+  def self.notify_complete
+    config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
+    manifest = Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt"))
+    mail = Mail.new do
+      to [config['email_admin_recipient'],  manifest.email]
+      from config['email_sender']
+      subject 'Deposit Complete'
+      body 'The deposit completed successfully'
+    end
+    mail.deliver
+  end
+
   def self.origin(drivename, collection)
     File.expand_path(File.join(drivename, collection))
   end
@@ -179,11 +191,23 @@ module FileQA
     end
 
     system "rsync", options, source, target
-
-    # Return system exit code
     s = ($?).to_s.split(" ")
     h = Hash[*s]
     h["exit"].to_i
+  end
+
+  def self.deposit_files
+    config = YAML.load_file(File.expand_path("config/deposit_files.yml"))
+    manifest = Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt"))
+    remote_checksum_file = "#{manifest.drivename}/#{manifest.name}/#{ADMIN_DIR}/#{REMOTE_CHECKSUM_FILENAME}"
+
+    create_remote_checksums_file(manifest.drivename, manifest.name, remote_checksum_file)
+    problems = verify_file_upload(manifest.drivename, manifest.name)
+    notify(manifest.drivename, manifest.name)
+    if problems.empty?
+      sync_success = sync(manifest.drivename, manifest.share, manifest.destination, manifest.name)
+      notify_complete
+    end
   end
 
 end
