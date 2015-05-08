@@ -16,6 +16,9 @@ class Manifest
 end
 
 module FileQA
+  class UploadError < StandardError
+  end
+
   attr_reader :problems
 
   ADMIN_DIR = "admin"
@@ -176,6 +179,11 @@ module FileQA
     end
 
     system "rsync", options, source, target
+
+    # Return system exit code
+    s = ($?).to_s.split(" ")
+    h = Hash[*s]
+    h["exit"].to_i
   end
 
 end

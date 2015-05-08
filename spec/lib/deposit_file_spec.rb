@@ -259,12 +259,12 @@ RSpec.describe FileQA do
     end
 
     it "successfully sync the file" do
-      expect(FileQA::sync(collection_drivename, collection_share, collection_destination, collection_name)).to_not raise_error
+      expect(FileQA::sync(collection_drivename, collection_share, collection_destination, collection_name)).to eq 0
     end
 
   end
 
-  context "Functional" do
+  context "Functional Spec" do
     xit "successfully transfer files"
     xit "fails to transfer files due to mismatch"
     xit "fails to transfer files due to missing file"
