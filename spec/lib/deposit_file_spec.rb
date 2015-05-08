@@ -28,24 +28,22 @@ RSpec.describe Manifest do
     end
   end
 
-  context "Sync files" do
-    let (:expected_origin) { "tmp/kittens" }
-    let (:expected_destination) { "tmp/deposit/cats/kittens" }
-    it "successfully sync the file"
-    it "fails to sync the file"
-  end
 end
 
 RSpec.describe FileQA do
   before (:each) do
     FileUtils.cp_r "spec/fixtures/kittens", "tmp"
+    FileUtils.mkdir "tmp/deposit"
   end
 
   after (:each) do
     FileUtils.rm_r "tmp/kittens"
+    FileUtils.rm_r "tmp/deposit"
   end
 
   let (:collection_drivename) { "#{Dir.pwd}/tmp" }
+  let (:collection_destination) { "cats" }
+  let (:collection_share) { "deposit" }
   let (:collection_name) { "kittens" }
   let (:remote_checksum_file) {"tmp/kittens/admin/checksum-remote.txt"}
   let (:remote_checksum_file_name) {"checksum-remote.txt"}
@@ -246,6 +244,31 @@ RSpec.describe FileQA do
       end
     end
 
+  end
+
+  context "Sync files" do
+    let (:expected_origin) { File.expand_path("tmp/kittens") }
+    let (:expected_destination) { File.expand_path("tmp/deposit/cats") }
+
+    it "generates a destination directory" do
+      expect(FileQA::destination(collection_drivename, collection_share, collection_destination)).to match "#{expected_destination}"
+    end
+
+    it "generates a origin directory" do
+      expect(FileQA::origin(collection_drivename, collection_name)).to match "#{expected_origin}"
+    end
+
+    it "successfully sync the file" do
+      expect(FileQA::sync(collection_drivename, collection_share, collection_destination, collection_name)).to_not raise_error
+    end
 
   end
+
+  context "Functional" do
+    xit "successfully transfer files"
+    xit "fails to transfer files due to mismatch"
+    xit "fails to transfer files due to missing file"
+    xit "fails to transfer files due to mismatch and missing file"
+  end
+
 end

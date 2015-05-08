@@ -158,4 +158,24 @@ module FileQA
     mail.deliver
   end
 
+  def self.origin(drivename, collection)
+    File.expand_path(File.join(drivename, collection))
+  end
+
+  def self.destination(drivename, share, destination)
+    File.expand_path(File.join(drivename, share, destination))
+  end
+
+  def self.sync(drivename, share, destination, collection)
+    source = origin(drivename, collection)
+    target = destination(drivename, share, destination)
+    options = "-av"
+
+    unless (Dir.exist?(target))
+      FileUtils.mkdir_p target
+    end
+
+    system "rsync", options, source, target
+  end
+
 end
