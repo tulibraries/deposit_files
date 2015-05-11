@@ -17,12 +17,11 @@ module FileQA
     end
   end
 
-  attr_reader :problems
-
   ADMIN_DIR = "admin"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
   PROBLEMS_FILENAME = "problems.txt"
+  IGNORE_DIRS = [".", "..", "admin", '.DS_Store']
 
   def self.read_checksums(checksum_path)
     checksums = Hash.new
@@ -32,12 +31,32 @@ module FileQA
     checksums
   end
 
-  def self.exclude_directory(directory)
-    excluded_directories = [".", "..", "admin"]
-    found = excluded_directories.select { |d| d =~ /#{directory}/ }
-    found.count != 0
+  # Recursively navigate all of the remote files,
+  # Returns an array of the absolute path to the remote files
+  def self.navigate_remote_files(root_path)
+    files = Array.new
+    Dir.entries(File.expand_path(root_path)).each do |entry|
+      if !IGNORE_DIRS.include?(entry)
+        file_path = File.join(root_path, entry)
+        if Dir.exist?(file_path)
+          files += navigate_remote_files(file_path)
+        else
+          files << file_path
+        end
+      end
+    end
+    files
   end
 
+  # Get all of the remote files and strips off the root
+  # Returns an array of the relative path to the remote files
+  def self.get_remote_files(root_path)
+    relative_file_paths = Array.new
+    navigate_remote_files(root_path).each do |file_name|
+      relative_file_paths << file_name.gsub(/^#{root_path}\//, '')
+    end
+    relative_file_paths
+  end
 
   def self.calculate_remote_checksums(drivename, collection_name)
     checksums = Array.new
@@ -45,16 +64,13 @@ module FileQA
 
     # Get the files for the subdirectories
 
-    u_directories = Dir.entries(root_path).select { |fn| File.directory?("#{root_path}/#{fn}") && !exclude_directory(fn)  }
+    transfer_files = get_remote_files(root_path)
 
-    # For each subdirectory, get the name of the file it contains
-    u_directories.each do |directory|
-      directory_path = "#{drivename}/#{collection_name}/#{directory}"
-      files = Dir.entries(directory_path).select { |fn| !File.directory?(fn) }
-      files.each do |file|
-        checksum = Digest::MD5.file("#{directory_path}/#{file}").hexdigest
-        checksums << { :path => "#{directory}/#{file}", :checksum => checksum }
-      end
+    # Create the remote checksum files
+
+    transfer_files.each do |file|
+      checksum = Digest::MD5.file("#{root_path}/#{file}").hexdigest
+      checksums << { :path => "#{file}", :checksum => checksum }
     end
 
     return checksums
