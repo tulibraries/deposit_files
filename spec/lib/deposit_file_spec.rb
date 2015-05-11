@@ -7,7 +7,7 @@ RSpec::Matchers.define :exist do
   end
 end
 
-RSpec.describe Manifest do
+RSpec.describe FileQA::Manifest do
   before (:each) do
     FileUtils.cp_r "spec/fixtures/kittens", "tmp"
   end
@@ -18,7 +18,7 @@ RSpec.describe Manifest do
   end
 
   context "Read Manifest" do
-    let (:manifest) { Manifest.new("tmp/kittens/admin/manifest.txt") }
+    let (:manifest) { FileQA::Manifest.new("tmp/kittens/admin/manifest.txt") }
     let (:drivename) { "tmp" }
     let (:destination) { "cats" }
     let (:share) { "deposit" }
@@ -48,7 +48,7 @@ RSpec.describe FileQA do
   end
 
   let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
-  let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
+  let (:manifest) { FileQA::Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
 
   let (:collection_drivename) { "#{Dir.pwd}/tmp" }
   let (:collection_destination) { "cats" }
@@ -171,9 +171,6 @@ RSpec.describe FileQA do
       Mail::TestMailer.deliveries.clear
     end
 
-    let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
-    let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
-
     describe "sending an email" do
 
       it "sends a upload successful message" do
@@ -260,7 +257,6 @@ RSpec.describe FileQA do
   end
 
   context "Sync files" do
-    let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
     let (:expected_origin) { File.expand_path("tmp/kittens") }
     let (:expected_destination) { File.expand_path("tmp/deposit/cats") }
 
