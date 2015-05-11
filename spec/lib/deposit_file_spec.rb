@@ -47,6 +47,9 @@ RSpec.describe FileQA do
     FileUtils.rm_r "tmp/deposit"
   end
 
+  let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
+  let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
+
   let (:collection_drivename) { "#{Dir.pwd}/tmp" }
   let (:collection_destination) { "cats" }
   let (:collection_share) { "deposit" }
@@ -174,7 +177,7 @@ RSpec.describe FileQA do
     describe "sending an email" do
 
       it "sends a upload successful message" do
-        FileQA::notify(collection_drivename, collection_name)
+        FileQA::notify(manifest)
         last_email = Mail::TestMailer.deliveries.last
         expect(last_email.to).to include(manifest.email)
         expect(last_email.to).to include(config['email_admin_recipient'])
@@ -199,7 +202,7 @@ RSpec.describe FileQA do
         it "has a problem file attached for file missing errors" do
           FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
 
-          FileQA::notify(collection_drivename, collection_name)
+          FileQA::notify(manifest)
           last_email = Mail::TestMailer.deliveries.last
           expect(last_email.to).to include(manifest.email)
           expect(last_email.to).to include(config['email_admin_recipient'])
@@ -214,7 +217,7 @@ RSpec.describe FileQA do
         it "has a checksum and problem file attached for mismatch errors" do
           FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
           FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
-          FileQA::notify(collection_drivename, collection_name)
+          FileQA::notify(manifest)
 
           last_email = Mail::TestMailer.deliveries.last
           expect(last_email.to).to include(manifest.email)
@@ -230,7 +233,7 @@ RSpec.describe FileQA do
         it "has a checksum and problem file attached for missing and mismatch errors" do
           FileUtils.cp_r "spec/fixtures/problem/problems.txt", "tmp/kittens/admin"
           FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
-          FileQA::notify(collection_drivename, collection_name)
+          FileQA::notify(manifest)
 
           last_email = Mail::TestMailer.deliveries.last
           expect(last_email.to).to include(manifest.email)
@@ -245,7 +248,7 @@ RSpec.describe FileQA do
       end
 
       it "sends a upload complete message" do
-        FileQA::notify_complete
+        FileQA::notify_complete(manifest)
         last_email = Mail::TestMailer.deliveries.last
         expect(last_email.to).to include(manifest.email)
         expect(last_email.to).to include(config['email_admin_recipient'])
@@ -257,19 +260,20 @@ RSpec.describe FileQA do
   end
 
   context "Sync files" do
+    let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
     let (:expected_origin) { File.expand_path("tmp/kittens") }
     let (:expected_destination) { File.expand_path("tmp/deposit/cats") }
 
     it "generates a destination directory" do
-      expect(FileQA::destination(collection_drivename, collection_share, collection_destination)).to match "#{expected_destination}"
+      expect(FileQA::destination(manifest)).to match "#{expected_destination}"
     end
 
     it "generates a origin directory" do
-      expect(FileQA::origin(collection_drivename, collection_name)).to match "#{expected_origin}"
+      expect(FileQA::origin(manifest)).to match "#{expected_origin}"
     end
 
     it "successfully sync the file" do
-      expect(FileQA::sync(collection_drivename, collection_share, collection_destination, collection_name)).to eq 0
+      expect(FileQA::sync(manifest)).to eq 0
     end
 
   end
@@ -285,11 +289,8 @@ RSpec.describe FileQA do
       Mail::TestMailer.deliveries.clear
     end
 
-    let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
-    let (:manifest) { Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
-
     it "runs successfull end-to-end test" do
-      FileQA::deposit_files
+      FileQA::deposit_files(manifest)
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
       first_email = Mail::TestMailer.deliveries.first
       expect(first_email.subject).to match /success/i
@@ -302,7 +303,9 @@ RSpec.describe FileQA do
         FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
         FileUtils.cp_r "spec/fixtures/problem/checksum-remote-mismatch.txt", "tmp/kittens/admin/checksum-remote.txt"
       end
-      FileQA::deposit_files
+
+      FileQA::deposit_files(manifest)
+
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
       first_email = Mail::TestMailer.deliveries.first
       expect(first_email.subject).to match /problem/i
@@ -315,7 +318,9 @@ RSpec.describe FileQA do
         FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
         FileUtils.cp_r "spec/fixtures/problem/checksum-remote-missing.txt", "tmp/kittens/admin/checksum-remote.txt"
       end
-      FileQA::deposit_files
+
+      FileQA::deposit_files(manifest)
+
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
       first_email = Mail::TestMailer.deliveries.first
       expect(first_email.subject).to match /problem/i

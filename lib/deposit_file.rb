@@ -16,8 +16,6 @@ class Manifest
 end
 
 module FileQA
-  class UploadError < StandardError
-  end
 
   attr_reader :problems
 
@@ -40,9 +38,6 @@ module FileQA
     found.count != 0
   end
 
-  def self.full_path(drivename, collection_name, directory)
-    "#{drivename}/#{collection_name}/#{directory}"
-  end
 
   def self.calculate_remote_checksums(drivename, collection_name)
     checksums = Array.new
@@ -54,7 +49,7 @@ module FileQA
 
     # For each subdirectory, get the name of the file it contains
     u_directories.each do |directory|
-      directory_path = full_path(drivename, collection_name, directory)
+      directory_path = "#{drivename}/#{collection_name}/#{directory}"
       files = Dir.entries(directory_path).select { |fn| !File.directory?(fn) }
       files.each do |file|
         checksum = Digest::MD5.file("#{directory_path}/#{file}").hexdigest
@@ -138,10 +133,9 @@ module FileQA
     return false
   end
 
-  def self.notify(drivename, collection_name)
-    problems_file_dir = "#{drivename}/#{collection_name}/#{ADMIN_DIR}"
+  def self.notify(manifest)
+    problems_file_dir = "#{manifest.drivename}/#{manifest.name}/#{ADMIN_DIR}"
     config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
-    manifest = Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt"))
     mail = Mail.new do
       to [config['email_admin_recipient'],  manifest.email]
       from config['email_sender']
@@ -161,9 +155,8 @@ module FileQA
     mail.deliver
   end
 
-  def self.notify_complete
+  def self.notify_complete(manifest)
     config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
-    manifest = Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt"))
     mail = Mail.new do
       to [config['email_admin_recipient'],  manifest.email]
       from config['email_sender']
@@ -173,17 +166,17 @@ module FileQA
     mail.deliver
   end
 
-  def self.origin(drivename, collection)
-    File.expand_path(File.join(drivename, collection))
+  def self.origin(manifest)
+    File.expand_path(File.join(manifest.drivename, manifest.name))
   end
 
-  def self.destination(drivename, share, destination)
-    File.expand_path(File.join(drivename, share, destination))
+  def self.destination(manifest)
+    File.expand_path(File.join(manifest.drivename, manifest.share, manifest.destination))
   end
 
-  def self.sync(drivename, share, destination, collection)
-    source = origin(drivename, collection)
-    target = destination(drivename, share, destination)
+  def self.sync(manifest)
+    source = origin(manifest)
+    target = destination(manifest)
     options = "-av"
 
     unless (Dir.exist?(target))
@@ -196,17 +189,16 @@ module FileQA
     h["exit"].to_i
   end
 
-  def self.deposit_files
+  def self.deposit_files(manifest)
     config = YAML.load_file(File.expand_path("config/deposit_files.yml"))
-    manifest = Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt"))
     remote_checksum_file = "#{manifest.drivename}/#{manifest.name}/#{ADMIN_DIR}/#{REMOTE_CHECKSUM_FILENAME}"
 
     create_remote_checksums_file(manifest.drivename, manifest.name, remote_checksum_file)
     problems = verify_file_upload(manifest.drivename, manifest.name)
-    notify(manifest.drivename, manifest.name)
+    notify(manifest)
     if problems.empty?
-      sync_success = sync(manifest.drivename, manifest.share, manifest.destination, manifest.name)
-      notify_complete
+      sync_success = sync(manifest)
+      notify_complete(manifest)
     end
   end
 
