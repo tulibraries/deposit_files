@@ -105,7 +105,7 @@ module FileQA
 
   def self.read_problems_file(problems_file_path)
     problems = Array.new
-    CSV.foreach(problems_file_path, :col_sep => '|').each do |row|
+    CSV.foreach(problems_file_path, :col_sep => '|', :headers => true).each do |row|
       problem = Hash.new
       problem[:local_path] = row[0]
       problem[:error] = row[1]
@@ -118,7 +118,8 @@ module FileQA
 
   def self.create_problems_file(problems, drivename, collection_name)
     problems_file_path = "#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{PROBLEMS_FILENAME}"
-    CSV.open(problems_file_path, "w", :col_sep => '|') do |csv|
+    CSV.open(problems_file_path, "w", :col_sep => '|', :headers => true) do |csv|
+      csv << ['path', 'error', 'local checksum', 'remote checksum']
       problems.each do |problem|
         row = Array.new
         row[0] = problem[:local_path]
@@ -194,12 +195,13 @@ module FileQA
     source = origin(manifest)
     target = destination(manifest)
     options = "-av"
+    exclude = "--exclude=.DS_Store"
 
     unless (Dir.exist?(target))
       FileUtils.mkdir_p target
     end
 
-    system "rsync", options, source, target
+    system "rsync", options, exclude, source, target
     s = ($?).to_s.split(" ")
     h = Hash[*s]
     h["exit"].to_i

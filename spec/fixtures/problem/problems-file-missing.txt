@@ -1,1 +1,2 @@
+path|error|local checksum|remote checksum
 pictures/image1.jpg|missing
