@@ -9,16 +9,17 @@ end
 
 RSpec.describe FileQA::Manifest do
   before (:each) do
-    FileUtils.cp_r "spec/fixtures/kittens", "tmp"
+    FileUtils.mkdir "tmp/deposit_temp"
+    FileUtils.cp_r "spec/fixtures/kittens", "tmp/deposit_temp"
   end
 
 
   after (:each) do
-    FileUtils.rm_r "tmp/kittens"
+    FileUtils.rm_r "tmp/deposit_temp"
   end
 
   context "Read Manifest" do
-    let (:manifest) { FileQA::Manifest.new("tmp/kittens/admin/manifest.txt") }
+    let (:manifest) { FileQA::Manifest.new("tmp/deposit_temp/kittens/admin/manifest.txt") }
     let (:drivename) { "tmp" }
     let (:destination) { "cats" }
     let (:share) { "deposit" }
@@ -38,23 +39,24 @@ end
 
 RSpec.describe FileQA do
   before (:each) do
-    FileUtils.cp_r "spec/fixtures/kittens", "tmp"
+    FileUtils.mkdir "tmp/deposit_temp"
+    FileUtils.cp_r "spec/fixtures/kittens", "tmp/deposit_temp"
     FileUtils.mkdir "tmp/deposit"
   end
 
   after (:each) do
-    FileUtils.rm_r "tmp/kittens"
+    FileUtils.rm_r "tmp/deposit_temp"
     FileUtils.rm_r "tmp/deposit"
   end
 
   let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
-  let (:manifest) { FileQA::Manifest.new(File.expand_path("tmp/kittens/admin/manifest.txt")) }
+  let (:manifest) { FileQA::Manifest.new(File.expand_path("tmp/deposit_temp/kittens/admin/manifest.txt")) }
 
   let (:collection_drivename) { "#{Dir.pwd}/tmp" }
   let (:collection_destination) { "cats" }
   let (:collection_share) { "deposit" }
   let (:collection_name) { "kittens" }
-  let (:remote_checksum_file) {"tmp/kittens/admin/checksum-remote.txt"}
+  let (:remote_checksum_file) {"tmp/deposit_temp/kittens/admin/checksum-remote.txt"}
   let (:remote_checksum_file_name) {"checksum-remote.txt"}
 
   let (:expected_checksums) {
@@ -72,7 +74,7 @@ RSpec.describe FileQA do
   end
 
   context "Reads checksum file" do
-    let (:local_file_checksums) { FileQA::read_checksums("tmp/kittens/admin/checksum.txt") }
+    let (:local_file_checksums) { FileQA::read_checksums("tmp/deposit_temp/kittens/admin/checksum.txt") }
 
     it "has valid data" do
       expect(local_file_checksums.count).to eq 3
@@ -144,14 +146,14 @@ RSpec.describe FileQA do
     end
 
     it "detects non-matching local and remote checksum file" do
-      FileUtils.cp "spec/fixtures/alternate/pictures/image2.jpg", "tmp/kittens/pictures/image2.jpg"
+      FileUtils.cp "spec/fixtures/alternate/pictures/image2.jpg", "tmp/deposit_temp/kittens/pictures/image2.jpg"
       FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
       problems = FileQA::verify_file_upload(collection_drivename, collection_name)
       expect(problems.first).to include(:error => "mismatch")
     end
 
     it "detects missing remote file" do
-      FileUtils.rm "tmp/kittens/pictures/image2.jpg"
+      FileUtils.rm "tmp/deposit_temp/kittens/pictures/image2.jpg"
       FileQA::create_remote_checksums_file(collection_drivename, collection_name, remote_checksum_file)
       problems = FileQA::verify_file_upload(collection_drivename, collection_name)
       expect(problems.first).to include(:error => "missing")
@@ -183,21 +185,21 @@ RSpec.describe FileQA do
       end
 
       it "detects mismatch in problems file" do
-        FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
-        expect(FileQA::mismatch?("tmp/kittens/admin/problems.txt")).to be
-        expect(FileQA::missing?("tmp/kittens/admin/problems.txt")).to_not be
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/deposit_temp/kittens/admin/problems.txt"
+        expect(FileQA::mismatch?("tmp/deposit_temp/kittens/admin/problems.txt")).to be
+        expect(FileQA::missing?("tmp/deposit_temp/kittens/admin/problems.txt")).to_not be
       end
 
       it "detects missing in problems file" do
-        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
-        expect(FileQA::missing?("tmp/kittens/admin/problems.txt")).to be
-        expect(FileQA::mismatch?("tmp/kittens/admin/problems.txt")).to_not be
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/deposit_temp/kittens/admin/problems.txt"
+        expect(FileQA::missing?("tmp/deposit_temp/kittens/admin/problems.txt")).to be
+        expect(FileQA::mismatch?("tmp/deposit_temp/kittens/admin/problems.txt")).to_not be
       end
 
       describe "Problem message" do
 
         it "has a problem file attached for file missing errors" do
-          FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
+          FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/deposit_temp/kittens/admin/problems.txt"
 
           FileQA::notify(manifest)
           last_email = Mail::TestMailer.deliveries.last
@@ -212,7 +214,7 @@ RSpec.describe FileQA do
         end
 
         it "has a checksum and problem file attached for mismatch errors" do
-          FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
+          FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/deposit_temp/kittens/admin/problems.txt"
           FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
           FileQA::notify(manifest)
 
@@ -228,7 +230,7 @@ RSpec.describe FileQA do
         end
 
         it "has a checksum and problem file attached for missing and mismatch errors" do
-          FileUtils.cp_r "spec/fixtures/problem/problems.txt", "tmp/kittens/admin"
+          FileUtils.cp_r "spec/fixtures/problem/problems.txt", "tmp/deposit_temp/kittens/admin"
           FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
           FileQA::notify(manifest)
 
@@ -257,7 +259,7 @@ RSpec.describe FileQA do
   end
 
   context "Sync files" do
-    let (:expected_origin) { File.expand_path("tmp/kittens") }
+    let (:expected_origin) { File.expand_path("tmp/deposit_temp/kittens") }
     let (:expected_destination) { File.expand_path("tmp/deposit/cats") }
 
     it "generates a destination directory" do
@@ -285,7 +287,7 @@ RSpec.describe FileQA do
       Mail::TestMailer.deliveries.clear
     end
 
-    it "runs successfull end-to-end test" do
+    it "runs successfully end-to-end test" do
       FileQA::deposit_files(manifest)
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
       first_email = Mail::TestMailer.deliveries.first
@@ -295,9 +297,9 @@ RSpec.describe FileQA do
     end
 
     it "fails to transfer files due to mismatch" do
-      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/kittens/admin/checksum-remote.txt") do
-        FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/kittens/admin/problems.txt"
-        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-mismatch.txt", "tmp/kittens/admin/checksum-remote.txt"
+      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/deposit_temp/kittens/admin/checksum-remote.txt") do
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-mismatch.txt", "tmp/deposit_temp/kittens/admin/problems.txt"
+        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-mismatch.txt", "tmp/deposit_temp/kittens/admin/checksum-remote.txt"
       end
 
       FileQA::deposit_files(manifest)
@@ -310,9 +312,9 @@ RSpec.describe FileQA do
     end
 
     it "fails to transfer files due to missing file" do
-      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/kittens/admin/checksum-remote.txt") do
-        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/kittens/admin/problems.txt"
-        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-missing.txt", "tmp/kittens/admin/checksum-remote.txt"
+      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/deposit_temp/kittens/admin/checksum-remote.txt") do
+        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/deposit_temp/kittens/admin/problems.txt"
+        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-missing.txt", "tmp/deposit_temp/kittens/admin/checksum-remote.txt"
       end
 
       FileQA::deposit_files(manifest)
