@@ -20,6 +20,7 @@ module FileQA
   ADMIN_DIR = "admin"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
+  STAGING_DIRECTORY = "deposit_temp"
   PROBLEMS_FILENAME = "problems.txt"
   IGNORE_DIRS = [".", "..", "admin", '.DS_Store']
 
@@ -60,7 +61,7 @@ module FileQA
 
   def self.calculate_remote_checksums(drivename, collection_name)
     checksums = Array.new
-    root_path = "#{drivename}/#{collection_name}"
+    root_path = File.join(drivename, collection_name)
 
     # Get the files for the subdirectories
 
@@ -69,8 +70,8 @@ module FileQA
     # Create the remote checksum files
 
     transfer_files.each do |file|
-      checksum = Digest::MD5.file("#{root_path}/#{file}").hexdigest
-      checksums << { :path => "#{file}", :checksum => checksum }
+      checksum = Digest::MD5.file(File.join(root_path, file)).hexdigest
+      checksums << { :path => file, :checksum => checksum }
     end
 
     return checksums
@@ -87,9 +88,9 @@ module FileQA
 
   def self.verify_file_upload(drivename, collection_name)
     # Read local checksum file
-    local_checksums = self.read_checksums("#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{LOCAL_CHECKSUM_FILENAME}")
+    local_checksums = self.read_checksums(File.join(drivename, collection_name, ADMIN_DIR, LOCAL_CHECKSUM_FILENAME))
     # Read remote checksum file
-    remote_checksums = self.read_checksums("#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{REMOTE_CHECKSUM_FILENAME}")
+    remote_checksums = self.read_checksums(File.join(drivename, collection_name, ADMIN_DIR, REMOTE_CHECKSUM_FILENAME))
     # Compare checksum file
     @problems = Array.new
     local_checksums.keys.each do |path|
@@ -117,7 +118,7 @@ module FileQA
   end
 
   def self.create_problems_file(problems, drivename, collection_name)
-    problems_file_path = "#{drivename}/#{collection_name}/#{ADMIN_DIR}/#{PROBLEMS_FILENAME}"
+    problems_file_path = File.join(drivename, collection_name, ADMIN_DIR, PROBLEMS_FILENAME)
     CSV.open(problems_file_path, "w", :col_sep => '|', :headers => true) do |csv|
       csv << ['path', 'error', 'local checksum', 'remote checksum']
       problems.each do |problem|
@@ -151,7 +152,7 @@ module FileQA
   end
 
   def self.notify(manifest)
-    problems_file_dir = "#{manifest.drivename}/#{manifest.name}/#{ADMIN_DIR}"
+    problems_file_dir = File.join(manifest.drivename, manifest.name, ADMIN_DIR)
     config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
     mail = Mail.new do
       to [config['email_admin_recipient'],  manifest.email]
@@ -159,10 +160,10 @@ module FileQA
     end
     if Dir.entries(problems_file_dir).include? PROBLEMS_FILENAME
       mail.subject('File Problem Encountered')
-      mail.add_file("#{problems_file_dir}/#{PROBLEMS_FILENAME}")
-      if mismatch?("#{problems_file_dir}/#{PROBLEMS_FILENAME}")
-        mail.add_file("#{problems_file_dir}/#{LOCAL_CHECKSUM_FILENAME}")
-        mail.add_file("#{problems_file_dir}/#{REMOTE_CHECKSUM_FILENAME}")
+      mail.add_file(File.join(problems_file_dir, PROBLEMS_FILENAME))
+      if mismatch?(File.join(problems_file_dir, PROBLEMS_FILENAME))
+        mail.add_file(File.join(problems_file_dir, LOCAL_CHECKSUM_FILENAME))
+        mail.add_file(File.join(problems_file_dir, REMOTE_CHECKSUM_FILENAME))
       end
     else
       mail.subject('File Uploaded Successfully')
@@ -209,7 +210,7 @@ module FileQA
 
   def self.deposit_files(manifest)
     config = YAML.load_file(File.expand_path("config/deposit_files.yml"))
-    remote_checksum_file = "#{manifest.drivename}/#{manifest.name}/#{ADMIN_DIR}/#{REMOTE_CHECKSUM_FILENAME}"
+    remote_checksum_file = File.join(manifest.drivename, manifest.name, ADMIN_DIR, REMOTE_CHECKSUM_FILENAME)
 
     create_remote_checksums_file(manifest.drivename, manifest.name, remote_checksum_file)
     problems = verify_file_upload(manifest.drivename, manifest.name)
