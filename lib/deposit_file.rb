@@ -17,7 +17,7 @@ module FileQA
     end
   end
 
-  STAGING_DIR = "deposit_temp"
+  STAGING_DIR = "deposit-temp"
   ADMIN_DIR = "admin"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
