@@ -4,10 +4,18 @@ require 'mail'
 
 module FileQA
 
+  STAGING_DIR = "deposit-temp"
+  ADMIN_DIR = "admin"
+  LOCAL_CHECKSUM_FILENAME = "checksum.txt"
+  REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
+  PROBLEMS_FILENAME = "problems.txt"
+  IGNORE_DIRS = [".", "..", "admin", '.DS_Store']
+
   class Manifest
     attr_reader :drivename, :destination, :share, :name, :email
 
-    def initialize(manifest_path)
+    def initialize(root, deposit_directory)
+      manifest_path = File.join(root, STAGING_DIR, deposit_directory, 'admin', 'manifest.txt')
       @manifest_file = File.open(manifest_path)
       @drivename = @manifest_file.readline.rstrip
       @destination = @manifest_file.readline.rstrip
@@ -17,12 +25,14 @@ module FileQA
     end
   end
 
-  STAGING_DIR = "deposit-temp"
-  ADMIN_DIR = "admin"
-  LOCAL_CHECKSUM_FILENAME = "checksum.txt"
-  REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
-  PROBLEMS_FILENAME = "problems.txt"
-  IGNORE_DIRS = [".", "..", "admin", '.DS_Store']
+  def self.get_deposits(root_path)
+    staging_path = File.join(root_path, STAGING_DIR)
+    deposits = Array.new
+    Dir.entries(staging_path).each do |entry|
+      deposits << entry if File.exist?(File.join(staging_path, entry, ADMIN_DIR, 'manifest.txt'))
+    end
+    deposits
+  end
 
   def self.read_checksums(checksum_path)
     checksums = Hash.new
@@ -208,16 +218,19 @@ module FileQA
     h["exit"].to_i
   end
 
-  def self.deposit_files(manifest)
-    config = YAML.load_file(File.expand_path("config/deposit_files.yml"))
-    remote_checksum_file = File.join(manifest.drivename, STAGING_DIR, manifest.name, ADMIN_DIR, REMOTE_CHECKSUM_FILENAME)
+  def self.deposit_files(root, deposits)
+    deposits.each do |deposit|
+      manifest = FileQA::Manifest.new(root, deposit)
+      config = YAML.load_file(File.expand_path("config/deposit_files.yml"))
+      remote_checksum_file = File.join(manifest.drivename, STAGING_DIR, manifest.name, ADMIN_DIR, REMOTE_CHECKSUM_FILENAME)
 
-    create_remote_checksums_file(manifest.drivename, manifest.name, remote_checksum_file)
-    problems = verify_file_upload(manifest.drivename, manifest.name)
-    notify(manifest)
-    if problems.empty?
-      sync_success = sync(manifest)
-      notify_complete(manifest)
+      create_remote_checksums_file(manifest.drivename, manifest.name, remote_checksum_file)
+      problems = verify_file_upload(manifest.drivename, manifest.name)
+      notify(manifest)
+      if problems.empty?
+        sync_success = sync(manifest)
+        notify_complete(manifest)
+      end
     end
   end
 

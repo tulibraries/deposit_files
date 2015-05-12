@@ -13,13 +13,33 @@ RSpec.describe FileQA::Manifest do
     FileUtils.cp_r "spec/fixtures/kittens", "tmp/deposit-temp"
   end
 
-
   after (:each) do
     FileUtils.rm_r "tmp/deposit-temp"
   end
 
+  context "Get_Deposits" do
+    it "is expected to find valid deposits" do
+      FileUtils.cp_r "spec/fixtures/kittens", "tmp/deposit-temp/more-kittens"
+      deposits = FileQA::get_deposits('tmp')
+      expect(deposits.include?('kittens')).to be
+      expect(deposits.include?('more-kittens')).to be
+    end
+
+    it "is expected to reject a non-directory file" do
+      FileUtils.touch 'tmp/deposit-temp/puppies'
+      deposits = FileQA::get_deposits('tmp')
+      expect(deposits.include?('puppies')).to_not be
+    end
+
+    it "is expected to reject a deposit without a manifest file" do
+      FileUtils.mkdir_p "/tmp/deposit-temp/chicks"
+      deposits = FileQA::get_deposits('tmp')
+      expect(deposits.include?('chicks')).to_not be
+    end
+  end
+
   context "Read Manifest" do
-    let (:manifest) { FileQA::Manifest.new("tmp/deposit-temp/kittens/admin/manifest.txt") }
+    let (:manifest) { FileQA::Manifest.new('tmp', 'kittens') }
     let (:drivename) { "tmp" }
     let (:destination) { "cats" }
     let (:share) { "deposit" }
@@ -50,7 +70,7 @@ RSpec.describe FileQA do
   end
 
   let (:config) { YAML.load_file(File.expand_path("config/deposit_files.yml")) }
-  let (:manifest) { FileQA::Manifest.new(File.expand_path("tmp/deposit-temp/kittens/admin/manifest.txt")) }
+  let (:manifest) { FileQA::Manifest.new('tmp', 'kittens') }
 
   let (:collection_drivename) { "#{Dir.pwd}/tmp" }
   let (:collection_destination) { "cats" }
@@ -288,8 +308,22 @@ RSpec.describe FileQA do
     end
 
     it "runs successfully end-to-end test" do
-      FileQA::deposit_files(manifest)
+      deposits = FileQA::get_deposits('tmp')
+      FileQA::deposit_files('tmp', deposits)
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
+      first_email = Mail::TestMailer.deliveries.first
+      expect(first_email.subject).to match /success/i
+      last_email = Mail::TestMailer.deliveries.last
+      expect(last_email.subject).to match /complete/i
+    end
+
+    it "runs on multiple files" do
+      FileUtils.cp_r "spec/fixtures/kittens", "tmp/deposit-temp/more-kittens"
+      FileUtils.cp_r "spec/fixtures/alternate/more-kittens/admin/manifest.txt", "tmp/deposit-temp/more-kittens/admin"
+      deposits = FileQA::get_deposits('tmp')
+      FileQA::deposit_files('tmp', deposits)
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
+      expect("tmp/deposit/cats/more-kittens/admin/manifest.txt").to exist
       first_email = Mail::TestMailer.deliveries.first
       expect(first_email.subject).to match /success/i
       last_email = Mail::TestMailer.deliveries.last
@@ -302,7 +336,8 @@ RSpec.describe FileQA do
         FileUtils.cp_r "spec/fixtures/problem/checksum-remote-mismatch.txt", "tmp/deposit-temp/kittens/admin/checksum-remote.txt"
       end
 
-      FileQA::deposit_files(manifest)
+      deposits = FileQA::get_deposits('tmp')
+      FileQA::deposit_files('tmp', deposits)
 
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
       first_email = Mail::TestMailer.deliveries.first
@@ -317,7 +352,8 @@ RSpec.describe FileQA do
         FileUtils.cp_r "spec/fixtures/problem/checksum-remote-missing.txt", "tmp/deposit-temp/kittens/admin/checksum-remote.txt"
       end
 
-      FileQA::deposit_files(manifest)
+      deposits = FileQA::get_deposits('tmp')
+      FileQA::deposit_files('tmp', deposits)
 
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
       first_email = Mail::TestMailer.deliveries.first
