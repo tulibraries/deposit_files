@@ -6,6 +6,7 @@ module FileQA
 
   STAGING_DIR = "deposit-temp"
   ADMIN_DIR = "admin"
+  MANIFEST_FILENAME = "manifest.txt"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
   PROBLEMS_FILENAME = "problems.txt"
@@ -15,7 +16,7 @@ module FileQA
     attr_reader :drivename, :destination, :share, :name, :email
 
     def initialize(root, deposit_directory)
-      manifest_path = File.join(root, STAGING_DIR, deposit_directory, 'admin', 'manifest.txt')
+      manifest_path = File.join(root, STAGING_DIR, deposit_directory, ADMIN_DIR, MANIFEST_FILENAME)
       @manifest_file = File.open(manifest_path)
       @drivename = @manifest_file.readline.rstrip
       @destination = @manifest_file.readline.rstrip
@@ -29,7 +30,7 @@ module FileQA
     staging_path = File.join(root_path, STAGING_DIR)
     deposits = Array.new
     Dir.entries(staging_path).each do |entry|
-      deposits << entry if File.exist?(File.join(staging_path, entry, ADMIN_DIR, 'manifest.txt'))
+      deposits << entry if File.exist?(File.join(staging_path, entry, ADMIN_DIR, MANIFEST_FILENAME))
     end
     deposits
   end
