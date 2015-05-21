@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 require_relative 'lib/deposit_file'
 
 Mail.defaults do
