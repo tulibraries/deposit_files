@@ -308,25 +308,45 @@ RSpec.describe FileQA do
     end
 
     it "runs successfully end-to-end test" do
+
       deposits = FileQA::get_deposits('tmp')
       FileQA::deposit_files('tmp', deposits)
-      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
+
       first_email = Mail::TestMailer.deliveries.first
-      expect(first_email.subject).to match /success/i
       last_email = Mail::TestMailer.deliveries.last
+
+      expect("tmp/deposit-temp/kittens/admin/problems.txt").to_not exist
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
+      expect("tmp/deposit/cats/kittens/admin/checksum-remote.txt").to exist
+      expect("tmp/deposit/cats/kittens/pictures/image1.jpg").to exist
+      expect("tmp/deposit/cats/kittens/pictures/image2.jpg").to exist
+      expect("tmp/deposit/cats/kittens/pictures/image3.jpg").to exist
+      expect(first_email.subject).to match /success/i
       expect(last_email.subject).to match /complete/i
     end
 
     it "runs on multiple files" do
       FileUtils.cp_r "spec/fixtures/kittens", "tmp/deposit-temp/more-kittens"
       FileUtils.cp_r "spec/fixtures/alternate/more-kittens/admin/manifest.txt", "tmp/deposit-temp/more-kittens/admin"
+
       deposits = FileQA::get_deposits('tmp')
       FileQA::deposit_files('tmp', deposits)
-      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
-      expect("tmp/deposit/cats/more-kittens/admin/manifest.txt").to exist
+
       first_email = Mail::TestMailer.deliveries.first
-      expect(first_email.subject).to match /success/i
       last_email = Mail::TestMailer.deliveries.last
+      expect("tmp/deposit-temp/kittens/admin/problems.txt").to_not exist
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
+      expect("tmp/deposit/cats/kittens/admin/checksum-remote.txt").to exist
+      expect("tmp/deposit/cats/kittens/pictures/image1.jpg").to exist
+      expect("tmp/deposit/cats/kittens/pictures/image2.jpg").to exist
+      expect("tmp/deposit/cats/kittens/pictures/image3.jpg").to exist
+      expect("tmp/deposit-temp/more-kittens/admin/problems.txt").to_not exist
+      expect("tmp/deposit/cats/more-kittens/admin/manifest.txt").to exist
+      expect("tmp/deposit/cats/more-kittens/admin/checksum-remote.txt").to exist
+      expect("tmp/deposit/cats/more-kittens/pictures/image1.jpg").to exist
+      expect("tmp/deposit/cats/more-kittens/pictures/image2.jpg").to exist
+      expect("tmp/deposit/cats/more-kittens/pictures/image3.jpg").to exist
+      expect(first_email.subject).to match /success/i
       expect(last_email.subject).to match /complete/i
     end
 
@@ -339,23 +359,26 @@ RSpec.describe FileQA do
       deposits = FileQA::get_deposits('tmp')
       FileQA::deposit_files('tmp', deposits)
 
-      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
       first_email = Mail::TestMailer.deliveries.first
-      expect(first_email.subject).to match /problem/i
       last_email = Mail::TestMailer.deliveries.last
+
+      expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
+      expect("tmp/deposit-temp/kittens/admin/problems.txt").to exist
+      expect("tmp/deposit-temp/kittens/admin/checksum-remote.txt").to exist
+      expect(first_email.subject).to match /problem/i
       expect(last_email.subject).to_not match /complete/i
     end
 
     it "fails to transfer files due to missing file" do
-      allow(FileQA).to receive(:create_remote_checksums_file).with(manifest.drivename, manifest.name, "tmp/deposit-temp/kittens/admin/checksum-remote.txt") do
-        FileUtils.cp_r "spec/fixtures/problem/problems-file-missing.txt", "tmp/deposit-temp/kittens/admin/problems.txt"
-        FileUtils.cp_r "spec/fixtures/problem/checksum-remote-missing.txt", "tmp/deposit-temp/kittens/admin/checksum-remote.txt"
-      end
+
+      # Make a file disappear
+      FileUtils.rm "tmp/deposit-temp/kittens/pictures/image2.jpg"
 
       deposits = FileQA::get_deposits('tmp')
       FileQA::deposit_files('tmp', deposits)
 
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to_not exist
+      expect("tmp/deposit-temp/kittens/admin/problems.txt").to exist
       first_email = Mail::TestMailer.deliveries.first
       expect(first_email.subject).to match /problem/i
       last_email = Mail::TestMailer.deliveries.last

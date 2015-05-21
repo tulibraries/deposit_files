@@ -108,6 +108,7 @@ module FileQA
       if (remote_checksums[path].nil?)
         @problems << { :local_path => path, :error => "missing" }
       elsif (local_checksums[path] != remote_checksums[path])
+        puts "Mismatch #{path} #{local_checksums[path]} #{remote_checksums[path]}"
         @problems << { :local_path => path, :error => "mismatch", :local_checksum => local_checksums[path], :remote_checksum => remote_checksums[:path] }
       end
     end
@@ -227,6 +228,7 @@ module FileQA
 
       create_remote_checksums_file(manifest.drivename, manifest.name, remote_checksum_file)
       problems = verify_file_upload(manifest.drivename, manifest.name)
+      create_problems_file(problems, manifest.drivename, manifest.name) if !problems.empty?
       notify(manifest)
       if problems.empty?
         sync_success = sync(manifest)
