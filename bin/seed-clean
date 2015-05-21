@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+#
+# Clean up the test seed directories
+#
+[ -d tmp/deposit-temp ] && rm -rf tmp/deposit-temp
+[ -d tmp/deposit ] && rm -rf tmp/deposit

@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+# Create a checksum mismatch
+#
+mkdir tmp/deposit-temp
+cp -pr spec/fixtures/kittens tmp/deposit-temp
+cp spec/fixtures/alternate/pictures/image2.jpg tmp/deposit-temp/kittens/pictures

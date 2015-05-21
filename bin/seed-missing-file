@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+#
+# Create a file missing scenario
+#
+mkdir tmp/deposit-temp
+cp -pr spec/fixtures/kittens tmp/deposit-temp
+rm -f tmp/deposit-temp/kittens/pictures/image2.jpg
