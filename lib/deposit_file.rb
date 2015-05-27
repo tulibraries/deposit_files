@@ -220,7 +220,6 @@ module FileQA
       FileUtils.mkdir_p target
     end
 
-    original_stdout = $stdout
     synclog = File.expand_path(File.join(admin_dir, SYNCLOG_FILENAME))
     cmd = "rsync #{options} #{exclude} #{source} #{target}"
     `#{cmd} >> #{synclog}`
