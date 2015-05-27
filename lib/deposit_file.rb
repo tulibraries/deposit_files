@@ -9,6 +9,7 @@ module FileQA
   MANIFEST_FILENAME = "manifest.txt"
   LOCAL_CHECKSUM_FILENAME = "checksum.txt"
   REMOTE_CHECKSUM_FILENAME = "checksum-remote.txt"
+  SYNCLOG_FILENAME = "deposit-sync.log"
   PROBLEMS_FILENAME = "problems.txt"
   IGNORE_DIRS = [".", "..", "admin", '.DS_Store']
 
@@ -108,7 +109,6 @@ module FileQA
       if (remote_checksums[path].nil?)
         @problems << { :local_path => path, :error => "missing" }
       elsif (local_checksums[path] != remote_checksums[path])
-        puts "Mismatch #{path} #{local_checksums[path]} #{remote_checksums[path]}"
         @problems << { :local_path => path, :error => "mismatch", :local_checksum => local_checksums[path], :remote_checksum => remote_checksums[:path] }
       end
     end
@@ -164,28 +164,32 @@ module FileQA
   end
 
   def self.notify(manifest)
-    problems_file_dir = File.join(manifest.drivename, STAGING_DIR, manifest.name, ADMIN_DIR)
+    admin_dir = File.join(manifest.drivename, STAGING_DIR, manifest.name, ADMIN_DIR)
     config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
     mail = Mail.new do
       to [config['email_admin_recipient'],  manifest.email]
       from config['email_sender']
     end
-    if Dir.entries(problems_file_dir).include? PROBLEMS_FILENAME
+    if Dir.entries(admin_dir).include? PROBLEMS_FILENAME
       mail.subject('File Problem Encountered')
-      mail.add_file(File.join(problems_file_dir, PROBLEMS_FILENAME))
-      if mismatch?(File.join(problems_file_dir, PROBLEMS_FILENAME))
-        mail.add_file(File.join(problems_file_dir, LOCAL_CHECKSUM_FILENAME))
-        mail.add_file(File.join(problems_file_dir, REMOTE_CHECKSUM_FILENAME))
+      mail.add_file(File.join(admin_dir, PROBLEMS_FILENAME))
+      if mismatch?(File.join(admin_dir, PROBLEMS_FILENAME))
+        mail.add_file(File.join(admin_dir, LOCAL_CHECKSUM_FILENAME))
+        mail.add_file(File.join(admin_dir, REMOTE_CHECKSUM_FILENAME))
       end
+      mail.body "A problem was detected in your uploaded files. Please see the attached files to determine the cause of the problem."
     else
       mail.subject('File Uploaded Successfully')
+      mail.body "Your files uploaded successfully and are being transferred to their final destination. You will receive a notice when the transfer completes"
+      mail.add_file(File.join(admin_dir, LOCAL_CHECKSUM_FILENAME))
+      mail.add_file(File.join(admin_dir, REMOTE_CHECKSUM_FILENAME))
     end
-    mail.body "This is a test message"
 
     mail.deliver
   end
 
   def self.notify_complete(manifest)
+    admin_dir = File.join(manifest.drivename, STAGING_DIR, manifest.name, ADMIN_DIR)
     config = YAML.load_file(File.expand_path("../../config/deposit_files.yml", __FILE__))
     mail = Mail.new do
       to [config['email_admin_recipient'],  manifest.email]
@@ -193,6 +197,7 @@ module FileQA
       subject 'Deposit Complete'
       body 'The deposit completed successfully'
     end
+    mail.add_file(File.expand_path(File.join(admin_dir, SYNCLOG_FILENAME)))
     mail.deliver
   end
 
@@ -205,6 +210,7 @@ module FileQA
   end
 
   def self.sync(manifest)
+    admin_dir = File.join(manifest.drivename, STAGING_DIR, manifest.name, ADMIN_DIR)
     source = origin(manifest)
     target = destination(manifest)
     options = "-av"
@@ -214,7 +220,10 @@ module FileQA
       FileUtils.mkdir_p target
     end
 
-    system "rsync", options, exclude, source, target
+    original_stdout = $stdout
+    synclog = File.expand_path(File.join(admin_dir, SYNCLOG_FILENAME))
+    cmd = "rsync #{options} #{exclude} #{source} #{target}"
+    `#{cmd} >> #{synclog}`
     s = ($?).to_s.split(" ")
     h = Hash[*s]
     h["exit"].to_i

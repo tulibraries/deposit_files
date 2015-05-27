@@ -196,12 +196,17 @@ RSpec.describe FileQA do
     describe "sending an email" do
 
       it "sends a upload successful message" do
+        FileUtils.cp_r "spec/fixtures/kittens/admin/checksum.txt", remote_checksum_file
+
         FileQA::notify(manifest)
         last_email = Mail::TestMailer.deliveries.last
         expect(last_email.to).to include(manifest.email)
         expect(last_email.to).to include(config['email_admin_recipient'])
         expect(last_email.subject).to match /success/i
-        expect(last_email.attachments).to be_empty
+
+        attachments = last_email.attachments.map { |attachment| attachment.filename }
+        expect(attachments).to include("checksum.txt")
+        expect(attachments).to include("checksum-remote.txt")
       end
 
       it "detects mismatch in problems file" do
@@ -267,12 +272,15 @@ RSpec.describe FileQA do
       end
 
       it "sends a upload complete message" do
+        system('touch', 'tmp/deposit-temp/kittens/admin/deposit-sync.log')
         FileQA::notify_complete(manifest)
         last_email = Mail::TestMailer.deliveries.last
         expect(last_email.to).to include(manifest.email)
         expect(last_email.to).to include(config['email_admin_recipient'])
         expect(last_email.subject).to match /complete/i
-        expect(last_email.attachments.count).to eq 0
+
+        attachments = last_email.attachments.map { |attachment| attachment.filename }
+        expect(attachments).to include("deposit-sync.log")
       end
     end
 
@@ -314,6 +322,7 @@ RSpec.describe FileQA do
 
       first_email = Mail::TestMailer.deliveries.first
       last_email = Mail::TestMailer.deliveries.last
+      attachments = last_email.attachments.map { |attachment| attachment.filename }
 
       expect("tmp/deposit-temp/kittens/admin/problems.txt").to_not exist
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
@@ -323,6 +332,7 @@ RSpec.describe FileQA do
       expect("tmp/deposit/cats/kittens/pictures/image3.jpg").to exist
       expect(first_email.subject).to match /success/i
       expect(last_email.subject).to match /complete/i
+      expect(attachments).to include("deposit-sync.log")
     end
 
     it "runs on multiple files" do
@@ -334,6 +344,8 @@ RSpec.describe FileQA do
 
       first_email = Mail::TestMailer.deliveries.first
       last_email = Mail::TestMailer.deliveries.last
+      attachments = last_email.attachments.map { |attachment| attachment.filename }
+
       expect("tmp/deposit-temp/kittens/admin/problems.txt").to_not exist
       expect("tmp/deposit/cats/kittens/admin/manifest.txt").to exist
       expect("tmp/deposit/cats/kittens/admin/checksum-remote.txt").to exist
@@ -348,6 +360,7 @@ RSpec.describe FileQA do
       expect("tmp/deposit/cats/more-kittens/pictures/image3.jpg").to exist
       expect(first_email.subject).to match /success/i
       expect(last_email.subject).to match /complete/i
+      expect(attachments).to include("deposit-sync.log")
     end
 
     it "fails to transfer files due to mismatch" do
